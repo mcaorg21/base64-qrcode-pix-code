@@ -1,11 +1,10 @@
 import base64
-import io
 
+import cv2
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image
 from pydantic import BaseModel
-from pyzbar import pyzbar
 
 app = FastAPI(title="QR Code PIX Reader", version="1.0.0")
 
@@ -29,17 +28,20 @@ async def decode_boleto(body: BoletoRequest):
 
     try:
         img_bytes = base64.b64decode(b64)
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("formato de imagem não suportado")
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Imagem inválida: {exc}") from exc
 
-    codes = pyzbar.decode(img)
-    qr_codes = [c for c in codes if c.type == "QRCODE"]
+    detector = cv2.QRCodeDetector()
+    data, _, _ = detector.detectAndDecode(img)
 
-    if not qr_codes:
+    if not data:
         raise HTTPException(status_code=404, detail="Nenhum QR Code encontrado na imagem")
 
-    return {"pix": qr_codes[0].data.decode("utf-8")}
+    return {"pix": data}
 
 
 @app.get("/health")
