@@ -3,6 +3,7 @@ import base64
 import cv2
 import fitz  # pymupdf
 import numpy as np
+import zxingcpp
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -22,9 +23,8 @@ class BoletoRequest(BaseModel):
 
 
 def _decode_qr(img_bgr: np.ndarray) -> str | None:
-    detector = cv2.QRCodeDetector()
-    data, _, _ = detector.detectAndDecode(img_bgr)
-    return data or None
+    results = zxingcpp.read_barcodes(img_bgr, formats=zxingcpp.BarcodeFormat.QRCode)
+    return results[0].text if results else None
 
 
 def _pdf_to_frames(pdf_bytes: bytes) -> list[np.ndarray]:
